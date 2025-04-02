@@ -7,7 +7,7 @@ import matplotlib
 matplotlib.use("Agg")  # Use Agg backend for off-screen rendering
 from queries import get_all_matches, load_data
 from functions import interpolate_ball_data, prepare_player_data, get_interpolated_positions
-
+import numpy as np
 # Initialize Pygame
 pygame.init()
 window_width, window_height = 1920, 1080
@@ -200,7 +200,7 @@ def animation_screen(match_id):
     fps = 24
     current_frame = 0
     total_frames = len(df_ball_interp)
-    playing = False  # Start in a paused state
+    playing = True  # Autoplay
     
     # Button dimensions
     button_width = 100
