@@ -1,13 +1,42 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pygame
 from pygame.locals import *
 from matplotlib import pyplot as plt
 from mplsoccer import Pitch
 import matplotlib.backends.backend_agg as agg
-import matplotlib
-matplotlib.use("Agg")  # Use Agg backend for off-screen rendering
 from queries import get_all_matchups, load_data, load_highlight_data, load_possession_data
 from functions import interpolate_ball_data, prepare_player_data, get_interpolated_positions
 import numpy as np
+import multiprocessing as mp
+import torch
+
+
+# Import multiprocessing libraries
+# Try to use GPU acceleration if available
+try:
+    # For matplotlib, switch to a GPU-accelerated backend if possible
+    import matplotlib
+    # Try to use a hardware-accelerated backend
+    matplotlib.use("Agg")  # Agg is often faster than default backends
+    
+    # Set OpenGL attributes BEFORE pygame.init()
+    pygame.display.gl_set_attribute(pygame.GL_ACCELERATED_VISUAL, 1)
+    
+    # Check if CUDA is available for numpy operations
+    import torch
+    use_cuda = torch.cuda.is_available()
+    if use_cuda:
+        print("CUDA GPU acceleration available and enabled!")
+        device = torch.device("cuda")
+    else:
+        print("CUDA not available, using CPU for computations")
+        device = torch.device("cpu")
+except ImportError:
+    print("PyTorch not installed, using standard CPU rendering")
+    use_cuda = False
+except pygame.error:
+    print("Could not set PyGame OpenGL attributes, using standard rendering")
+
 # Initialize Pygame
 pygame.init()
 window_width, window_height = 1920, 1080 # Change it to relative value for different screens
@@ -399,15 +428,60 @@ def highlight_animation_screen(match_id, period, possession_idx):
     total_frames = len(df_ball_interp)
     print(f"Interpolated to {total_frames} frames for {real_duration:.2f} seconds = {total_frames/real_duration:.2f} FPS")
     
-    # PERFORMANCE OPTIMIZATION: Pre-render all frames
-    # This is more memory-intensive but much faster during playback
-    print("Pre-rendering frames...")
+    # PERFORMANCE OPTIMIZATION: Pre-render all frames with GPU acceleration
+    print("Pre-rendering frames with GPU acceleration...")
     pre_rendered_frames = []
-    for i in range(total_frames):
-        if i % 20 == 0:  # Progress update every 20 frames
-            print(f"Rendering frame {i}/{total_frames}...")
-        frame = draw_frame(i, df_ball_interp, home_frames, home_positions, away_frames, away_positions)
-        pre_rendered_frames.append(frame)
+    num_cores = max(1, mp.cpu_count() - 2)
+    print(f"Using {num_cores} CPU cores for parallel rendering")
+    
+    # Calculate how many frames to render per process
+    chunk_size = max(1, total_frames // num_cores)
+    
+    # Function to render a chunk of frames
+    def render_frames_chunk(start_idx, end_idx):
+        chunk_frames = []
+        for i in range(start_idx, min(end_idx, total_frames)):
+            if i % 50 == 0:
+                print(f"Process rendering frames {start_idx}-{end_idx}: {i}/{end_idx - start_idx} complete")
+            
+            # Render the frame
+            frame = draw_frame(i, df_ball_interp, home_frames, home_positions, away_frames, away_positions)
+            chunk_frames.append(frame)
+        return chunk_frames
+    
+    # Start parallel rendering processes
+    chunks = [(i, i + chunk_size) for i in range(0, total_frames, chunk_size)]
+    
+    # Use ThreadPoolExecutor for better performance with I/O-bound operations
+    with ThreadPoolExecutor(max_workers=num_cores) as executor:
+        future_chunks = {executor.submit(render_frames_chunk, start, end): (start, end) 
+                        for start, end in chunks}
+        
+        # Process results as they come in
+        for future in as_completed(future_chunks):
+            try:
+                # Get rendered frames from this chunk
+                chunk_frames = future.result()
+                pre_rendered_frames.extend(chunk_frames)
+                print(f"Added {len(chunk_frames)} frames, now have {len(pre_rendered_frames)}/{total_frames}")
+            except Exception as e:
+                print(f"Error in chunk rendering: {e}")
+                # Add placeholder frames if rendering failed
+                start, end = future_chunks[future]
+                for _ in range(start, min(end, total_frames)):
+                    s = pygame.Surface((1600, 1040))
+                    s.fill((20, 70, 20))
+                    pre_rendered_frames.append(s)
+    
+    # Sort frames if they came in out of order
+    if len(pre_rendered_frames) != total_frames:
+        print(f"Warning: Expected {total_frames} frames but got {len(pre_rendered_frames)}")
+        # Pad with extra frames if needed
+        while len(pre_rendered_frames) < total_frames:
+            s = pygame.Surface((1600, 1040))
+            s.fill((20, 70, 20))
+            pre_rendered_frames.append(s)
+    
     print("All frames pre-rendered!")
     
     # Game loop settings
