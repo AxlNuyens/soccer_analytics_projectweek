@@ -7,7 +7,7 @@ import matplotlib
 matplotlib.use("Agg")  # Use Agg backend for off-screen rendering
 from queries import get_all_matches, load_data
 from functions import interpolate_ball_data, prepare_player_data, get_interpolated_positions
-import numpy as np
+
 # Initialize Pygame
 pygame.init()
 window_width, window_height = 1920, 1080 # Change it to relative value for different screens
@@ -53,13 +53,9 @@ def draw_frame(frame_idx, df_ball_interp, home_frames, home_positions, away_fram
         canvas = agg.FigureCanvasAgg(fig)
         canvas.draw()
         renderer = canvas.get_renderer()
-        
-        raw_data = renderer.tostring_argb()
+        raw_data = renderer.tostring_rgb()
         canvas_width, canvas_height = canvas.get_width_height()
-
-        argb_array = np.frombuffer(raw_data, dtype=np.uint8).reshape(canvas_height, canvas_width, 4)
-        rgb_array = argb_array[:, :, 1:]
-        return pygame.image.frombuffer(rgb_array.tobytes(), (canvas_width, canvas_height), "RGB")
+        return pygame.image.fromstring(raw_data, (canvas_width, canvas_height), "RGB")
     except Exception as e:
         print(f"Frame rendering error: {e}")
         # Return a blank surface if there's an error
@@ -179,168 +175,7 @@ def match_selection_menu():
         pygame.display.flip()
     
     return selected_match_id
-def possession_selection_menu(match_id, df_possesion_first_period, df_possesion_second_period):
-    """Display a menu to select a specific possession change moment."""
-    # Menu settings
-    font_large = pygame.font.SysFont("Arial", 36)
-    font_medium = pygame.font.SysFont("Arial", 28)
-    font = pygame.font.SysFont("Arial", 24)
-    
-    title_text = font_large.render("Select a Possession Change Moment", True, (255, 255, 255))
-    instruction_text = font_medium.render("Click on a moment to view or ESC to go back", True, (200, 200, 200))
-    
-    # Colors
-    bg_color = (20, 55, 20)  # Dark green background
-    button_color = (40, 80, 40)  # Slightly lighter green
-    hover_color = (60, 120, 60)  # Highlight color
-    period1_color = (40, 80, 120)  # Blue for 1st period
-    period2_color = (120, 40, 80)  # Red for 2nd period
-    
-    # Period selection
-    period_buttons = []
-    period_button_width = 150
-    period_button_height = 40
-    
-    period1_button = pygame.Rect(window_width // 2 - period_button_width - 10, 140, period_button_width, period_button_height)
-    period2_button = pygame.Rect(window_width // 2 + 10, 140, period_button_width, period_button_height)
-    
-    period_buttons.append((period1_button, "1st Period"))
-    period_buttons.append((period2_button, "2nd Period"))
-    
-    current_period = "1st Period"
-    current_df = df_possesion_first_period
-    
-    # Maximum possessions per page and scrolling
-    possessions_per_page = 10
-    current_scroll = 0
-    max_scroll = max(0, len(current_df) - possessions_per_page)
-    
-    # Create buttons for each possession
-    button_height = 60
-    button_margin = 10
-    menu_y_start = 200  # Start position for the first button
-    
-    # Scroll buttons
-    scroll_up_button = pygame.Rect(window_width - 100, menu_y_start, 80, 40)
-    scroll_down_button = pygame.Rect(window_width - 100, window_height - 100, 80, 40)
-    
-    running = True
-    selected_possession_idx = None
-    
-    while running:
-        screen.fill(bg_color)
-        
-        # Draw title and instructions
-        screen.blit(title_text, (window_width // 2 - title_text.get_width() // 2, 50))
-        screen.blit(instruction_text, (window_width // 2 - instruction_text.get_width() // 2, 100))
-        
-        # Draw period buttons
-        for button, label in period_buttons:
-            if label == current_period:
-                color = period1_color if label == "1st Period" else period2_color
-            else:
-                color = button_color
-            
-            pygame.draw.rect(screen, color, button)
-            button_text = font.render(label, True, (255, 255, 255))
-            screen.blit(button_text, (button.centerx - button_text.get_width() // 2, 
-                                     button.centery - button_text.get_height() // 2))
-        
-        # Draw scroll buttons if needed
-        if len(current_df) > possessions_per_page:
-            pygame.draw.rect(screen, (80, 80, 80), scroll_up_button)
-            pygame.draw.rect(screen, (80, 80, 80), scroll_down_button)
-            up_text = font.render("▲", True, (255, 255, 255))
-            down_text = font.render("▼", True, (255, 255, 255))
-            screen.blit(up_text, (scroll_up_button.centerx - up_text.get_width() // 2, 
-                                scroll_up_button.centery - up_text.get_height() // 2))
-            screen.blit(down_text, (scroll_down_button.centerx - down_text.get_width() // 2, 
-                                  scroll_down_button.centery - down_text.get_height() // 2))
-        
-        # Draw possession buttons
-        visible_possessions = current_df.iloc[current_scroll:current_scroll + possessions_per_page]
-        possession_buttons = []
-        
-        for i, (idx, possession) in enumerate(visible_possessions.iterrows()):
-            button_y = menu_y_start + (button_height + button_margin) * i
-            possession_button = pygame.Rect(window_width // 2 - 400, button_y, 800, button_height)
-            # Store the original index from the dataframe, not just the loop index
-            possession_buttons.append((possession_button, idx))
-            
-            # Check if mouse is hovering over this button
-            mouse_pos = pygame.mouse.get_pos()
-            if possession_button.collidepoint(mouse_pos):
-                pygame.draw.rect(screen, hover_color, possession_button)
-            else:
-                pygame.draw.rect(screen, button_color, possession_button)
-            
-            # Draw possession info
-            timestamp = possession['seconds']
-            losing_team = possession.get('losing_team', 'Unknown')
-            gaining_team = possession.get('gaining_team', 'Unknown')
-            
-            # Format time as MM:SS
-            minutes = int(timestamp // 60)
-            seconds = int(timestamp % 60)
-            time_str = f"{minutes:02d}:{seconds:02d}"
-            
-            possession_text = font.render(f"Time: {time_str} - {losing_team} lost to {gaining_team}", True, (255, 255, 255))
-            
-            # Draw additional info (optional)
-            if 'x' in possession and 'y' in possession:
-                location_text = font_medium.render(f"Location: ({possession['x']:.1f}, {possession['y']:.1f})", 
-                                               True, (220, 220, 220))
-                screen.blit(location_text, (possession_button.x + 20, possession_button.y + 35))
-            
-            # Draw the text
-            screen.blit(possession_text, (possession_button.x + 20, possession_button.y + 10))
-        
-        # Process events
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-                pygame.quit()
-                exit()
-            
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-                elif event.key == pygame.K_UP:
-                    current_scroll = max(0, current_scroll - 1)
-                elif event.key == pygame.K_DOWN:
-                    current_scroll = min(max_scroll, current_scroll + 1)
-            
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                # Check if a period button was clicked
-                for button, label in period_buttons:
-                    if button.collidepoint(event.pos) and label != current_period:
-                        current_period = label
-                        if label == "1st Period":
-                            current_df = df_possesion_first_period
-                        else:
-                            current_df = df_possesion_second_period
-                        
-                        current_scroll = 0
-                        max_scroll = max(0, len(current_df) - possessions_per_page)
-                        break
-                
-                # Check if a possession was clicked
-                for button, orig_idx in possession_buttons:
-                    if button.collidepoint(event.pos):
-                        selected_possession_idx = orig_idx
-                        # Return both the index and which period was selected
-                        return (current_period, selected_possession_idx)
-                
-                # Check scroll buttons
-                if len(current_df) > possessions_per_page:
-                    if scroll_up_button.collidepoint(event.pos):
-                        current_scroll = max(0, current_scroll - 1)
-                    elif scroll_down_button.collidepoint(event.pos):
-                        current_scroll = min(max_scroll, current_scroll + 1)
-        
-        pygame.display.flip()
-    
-    return None  # Return None if user cancels
+
 # Animation screen
 def animation_screen(match_id):
     # Load data for the selected match
@@ -515,6 +350,210 @@ def animation_screen(match_id):
     
     return "quit"
 
+def prepare_possession_data(possession_index, df_possesion_first_period, df_home, df_away, df_ball):
+    
+    global df_ball_interp, home_frames, home_positions, away_frames, away_positions
+    
+    # Get the possession data
+    period_df = df_possesion_first_period
+    if possession_index >= len(period_df):
+        possession_index = len(period_df) - 1
+    
+    possession = period_df.iloc[possession_index]
+    timestamp = possession['seconds']
+    
+    # Filter data for the time window around the possession change
+    window_start = timestamp - 3  # 3 seconds before
+    window_end = timestamp + 7    # 7 seconds after
+    
+    df_team_home = df_home[(df_home['timestamp'] >= window_start) & (df_home['timestamp'] <= window_end)]
+    df_team_away = df_away[(df_away['timestamp'] >= window_start) & (df_away['timestamp'] <= window_end)]
+    df_ball_event = df_ball[(df_ball['timestamp'] >= window_start) & (df_ball['timestamp'] <= window_end)]
+    
+    # Check if we have data
+    if df_team_home.empty or df_team_away.empty or df_ball_event.empty:
+        print(f"No data available for possession change at {timestamp}")
+        return False
+    
+    # Process data
+    print(f"Preparing data for possession change at {timestamp}")
+    frames_between = 24
+    df_ball_interp = interpolate_ball_data(df_ball_event, frames_between)
+    home_frames, home_positions = prepare_player_data(df_team_home, "home")
+    away_frames, away_positions = prepare_player_data(df_team_away, "away")
+    
+    # Set information text
+    possession_info = f"Possession Change at {timestamp:.2f}s"
+    if 'losing_team' in possession and 'gaining_team' in possession:
+        possession_info += f" | {possession['losing_team']} → {possession['gaining_team']}"
+   
+    
+    return True
+
+# Add this new function for the possession selection menu
+
+def possession_selection_menu(match_id, df_possesion_first_period, df_possesion_second_period):
+    """Display a menu to select a specific possession change moment."""
+    # Menu settings
+    font_large = pygame.font.SysFont("Arial", 36)
+    font_medium = pygame.font.SysFont("Arial", 28)
+    font = pygame.font.SysFont("Arial", 24)
+    
+    title_text = font_large.render("Select a Possession Change Moment", True, (255, 255, 255))
+    instruction_text = font_medium.render("Click on a moment to view or ESC to go back", True, (200, 200, 200))
+    
+    # Colors
+    bg_color = (20, 55, 20)  # Dark green background
+    button_color = (40, 80, 40)  # Slightly lighter green
+    hover_color = (60, 120, 60)  # Highlight color
+    period1_color = (40, 80, 120)  # Blue for 1st period
+    period2_color = (120, 40, 80)  # Red for 2nd period
+    
+    # Period selection
+    period_buttons = []
+    period_button_width = 150
+    period_button_height = 40
+    
+    period1_button = pygame.Rect(window_width // 2 - period_button_width - 10, 140, period_button_width, period_button_height)
+    period2_button = pygame.Rect(window_width // 2 + 10, 140, period_button_width, period_button_height)
+    
+    period_buttons.append((period1_button, "1st Period"))
+    period_buttons.append((period2_button, "2nd Period"))
+    
+    current_period = "1st Period"
+    current_df = df_possesion_first_period
+    
+    # Maximum possessions per page and scrolling
+    possessions_per_page = 10
+    current_scroll = 0
+    max_scroll = max(0, len(current_df) - possessions_per_page)
+    
+    # Create buttons for each possession
+    button_height = 60
+    button_margin = 10
+    menu_y_start = 200  # Start position for the first button
+    
+    # Scroll buttons
+    scroll_up_button = pygame.Rect(window_width - 100, menu_y_start, 80, 40)
+    scroll_down_button = pygame.Rect(window_width - 100, window_height - 100, 80, 40)
+    
+    running = True
+    selected_possession_idx = None
+    
+    while running:
+        screen.fill(bg_color)
+        
+        # Draw title and instructions
+        screen.blit(title_text, (window_width // 2 - title_text.get_width() // 2, 50))
+        screen.blit(instruction_text, (window_width // 2 - instruction_text.get_width() // 2, 100))
+        
+        # Draw period buttons
+        for button, label in period_buttons:
+            if label == current_period:
+                color = period1_color if label == "1st Period" else period2_color
+            else:
+                color = button_color
+            
+            pygame.draw.rect(screen, color, button)
+            button_text = font.render(label, True, (255, 255, 255))
+            screen.blit(button_text, (button.centerx - button_text.get_width() // 2, 
+                                     button.centery - button_text.get_height() // 2))
+        
+        # Draw scroll buttons if needed
+        if len(current_df) > possessions_per_page:
+            pygame.draw.rect(screen, (80, 80, 80), scroll_up_button)
+            pygame.draw.rect(screen, (80, 80, 80), scroll_down_button)
+            up_text = font.render("▲", True, (255, 255, 255))
+            down_text = font.render("▼", True, (255, 255, 255))
+            screen.blit(up_text, (scroll_up_button.centerx - up_text.get_width() // 2, 
+                                scroll_up_button.centery - up_text.get_height() // 2))
+            screen.blit(down_text, (scroll_down_button.centerx - down_text.get_width() // 2, 
+                                  scroll_down_button.centery - down_text.get_height() // 2))
+        
+        # Draw possession buttons
+        visible_possessions = current_df.iloc[current_scroll:current_scroll + possessions_per_page]
+        possession_buttons = []
+        
+        for i, (idx, possession) in enumerate(visible_possessions.iterrows()):
+            button_y = menu_y_start + (button_height + button_margin) * i
+            possession_button = pygame.Rect(window_width // 2 - 400, button_y, 800, button_height)
+            # Store the original index from the dataframe, not just the loop index
+            possession_buttons.append((possession_button, idx))
+            
+            # Check if mouse is hovering over this button
+            mouse_pos = pygame.mouse.get_pos()
+            if possession_button.collidepoint(mouse_pos):
+                pygame.draw.rect(screen, hover_color, possession_button)
+            else:
+                pygame.draw.rect(screen, button_color, possession_button)
+            
+            # Draw possession info
+            timestamp = possession['seconds']
+            losing_team = possession.get('losing_team', 'Unknown')
+            gaining_team = possession.get('gaining_team', 'Unknown')
+            
+            # Format time as MM:SS
+            minutes = int(timestamp // 60)
+            seconds = int(timestamp % 60)
+            time_str = f"{minutes:02d}:{seconds:02d}"
+            
+            possession_text = font.render(f"Time: {time_str} - {losing_team} lost to {gaining_team}", True, (255, 255, 255))
+            
+            # Draw additional info (optional)
+            if 'x' in possession and 'y' in possession:
+                location_text = font_medium.render(f"Location: ({possession['x']:.1f}, {possession['y']:.1f})", 
+                                               True, (220, 220, 220))
+                screen.blit(location_text, (possession_button.x + 20, possession_button.y + 35))
+            
+            # Draw the text
+            screen.blit(possession_text, (possession_button.x + 20, possession_button.y + 10))
+        
+        # Process events
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                pygame.quit()
+                exit()
+            
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                elif event.key == pygame.K_UP:
+                    current_scroll = max(0, current_scroll - 1)
+                elif event.key == pygame.K_DOWN:
+                    current_scroll = min(max_scroll, current_scroll + 1)
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                # Check if a period button was clicked
+                for button, label in period_buttons:
+                    if button.collidepoint(event.pos) and label != current_period:
+                        current_period = label
+                        if label == "1st Period":
+                            current_df = df_possesion_first_period
+                        else:
+                            current_df = df_possesion_second_period
+                        
+                        current_scroll = 0
+                        max_scroll = max(0, len(current_df) - possessions_per_page)
+                        break
+                
+                # Check if a possession was clicked
+                for button, orig_idx in possession_buttons:
+                    if button.collidepoint(event.pos):
+                        selected_possession_idx = orig_idx
+                        # Return both the index and which period was selected
+                        return (current_period, selected_possession_idx)
+                
+                # Check scroll buttons
+                if len(current_df) > possessions_per_page:
+                    if scroll_up_button.collidepoint(event.pos):
+                        current_scroll = max(0, current_scroll - 1)
+                    elif scroll_down_button.collidepoint(event.pos):
+                        current_scroll = min(max_scroll, current_scroll + 1)
+        
+        pygame.display.flip()
+    
+    return None  # Return None if user cancels
 
 # Main game loop
 def main():

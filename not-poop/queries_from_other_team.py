@@ -78,7 +78,14 @@ JOIN teams t2 ON m.away_team_id = t2.team_id
 WHERE m.match_id = '%s'
 ORDER BY m.match_id;
 """
-POSSESSION_QUERY = """
+# Function to get all available matches
+def get_all_matches():
+    conn = get_connection()
+    matches_df = pd.read_sql_query(LIST_OF_ALL_MATCHES, conn)
+    conn.close()
+    return matches_df
+
+POSSESION_QUERY = """
     WITH action_changes AS (
         SELECT
             a.*,
@@ -148,12 +155,7 @@ POSSESSION_QUERY = """
         s.period_id, s.seconds
     """
 
-# Function to get all available matches
-def get_all_matches():
-    conn = get_connection()
-    matches_df = pd.read_sql_query(LIST_OF_ALL_MATCHES, conn)
-    conn.close()
-    return matches_df
+    
 
 # Load data from the database
 def load_data(match_id):
@@ -170,7 +172,7 @@ def load_data(match_id):
     df_home = pd.read_sql_query(TEAM_QUERIES, conn, params=(match_id, team_ids[0],))
     df_away = pd.read_sql_query(TEAM_QUERIES, conn, params=(match_id, team_ids[1],))
     
-    df_possesion = pd.read_sql_query(POSSESSION_QUERY, conn, params=(match_id,))
+    df_possesion = pd.read_sql_query(POSSESION_QUERY, conn, params=(match_id,))
     
     df_possesion_first_period = df_possesion[df_possesion['period_id'] == 1]
     df_possesion_second_period = df_possesion[df_possesion['period_id'] == 2]
