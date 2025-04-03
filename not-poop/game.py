@@ -197,7 +197,7 @@ def animation_screen(match_id):
     
     # Game loop settings
     clock = pygame.time.Clock()
-    fps = 24
+    fps = 25
     current_frame = 0
     total_frames = len(df_ball_interp)
     playing = True  # Autoplay
@@ -235,7 +235,7 @@ def animation_screen(match_id):
                     playing = False
                 elif restart_button.collidepoint(event.pos):
                     current_frame = 0
-                    playing = False
+                    playing = True
                 elif back_button.collidepoint(event.pos):
                     return "menu"  # Signal to go back to the menu
         
