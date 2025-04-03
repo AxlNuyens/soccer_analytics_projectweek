@@ -392,6 +392,7 @@ def highlight_animation_screen(match_id, period, possession_idx):
     
     print(f"Successfully loaded highlight data: {len(df_ball)} ball points, {len(df_home)} home player points, {len(df_away)} away player points")
     
+<<<<<<< HEAD
     # Calculate the real-time duration of the highlight
     if len(df_ball) >= 2:
         start_time = df_ball['timestamp'].min()
@@ -421,6 +422,10 @@ def highlight_animation_screen(match_id, period, possession_idx):
         print("Using default interpolation of 119 frames between points")
     
     # Interpolate highlight data with calculated frame count
+=======
+    # Interpolate highlight data
+    frames_between = 12
+>>>>>>> parent of f82d795 (interpolation fixed)
     df_ball_interp = interpolate_ball_data(df_ball, frames_between)
     home_frames, home_positions = prepare_player_data(df_home, "home")
     away_frames, away_positions = prepare_player_data(df_away, "away")
@@ -428,6 +433,7 @@ def highlight_animation_screen(match_id, period, possession_idx):
     total_frames = len(df_ball_interp)
     print(f"Interpolated to {total_frames} frames for {real_duration:.2f} seconds = {total_frames/real_duration:.2f} FPS")
     
+<<<<<<< HEAD
     # PERFORMANCE OPTIMIZATION: Pre-render all frames with GPU acceleration
     print("Pre-rendering frames with GPU acceleration...")
     pre_rendered_frames = []
@@ -491,6 +497,11 @@ def highlight_animation_screen(match_id, period, possession_idx):
     start_time_ms = pygame.time.get_ticks()
     pause_offset = 0  # Track paused time
     last_pause_time = 0
+=======
+    # Game loop settings
+    clock = pygame.time.Clock()
+    fps = 24
+>>>>>>> parent of f82d795 (interpolation fixed)
     current_frame = 0
     playing = True  # Start in a playing state for highlights
     
@@ -627,10 +638,14 @@ def highlight_animation_screen(match_id, period, possession_idx):
         
         # Update the display
         pygame.display.flip()
+<<<<<<< HEAD
         
         # Use a consistent high FPS for smooth rendering
         # The actual animation speed is controlled by our time-based calculations
         clock.tick(120)  # Aim for 120 FPS rendering
+=======
+        clock.tick(fps)
+>>>>>>> parent of f82d795 (interpolation fixed)
     
     return "highlights"  # Return to highlight selection by default
 # Animation screen
@@ -799,6 +814,182 @@ def highlight_selection_menu(match_id):
         pygame.display.flip()
     
     return None  # Return None if user cancels
+<<<<<<< HEAD
+=======
+def animation_screen(match_id):
+    # Load data for the selected match
+    df_ball, df_home, df_away, df_possesion_first_period, df_possesion_second_period = load_data(match_id)
+    
+    if df_ball is None or df_ball.empty:
+        print(f"No data available for match {match_id}")
+        return
+    
+    # Interpolate full match data
+    frames_between = 12
+    df_ball_interp = interpolate_ball_data(df_ball, frames_between)
+    home_frames, home_positions = prepare_player_data(df_home, "home")
+    away_frames, away_positions = prepare_player_data(df_away, "away")
+    
+    # Variables to track if we're viewing a specific possession change
+    viewing_possession = False
+    possession_ball_interp = None
+    possession_home_frames = None
+    possession_home_positions = None
+    possession_away_frames = None
+    possession_away_positions = None
+    possession_info = ""
+    
+    # Game loop settings
+    clock = pygame.time.Clock()
+    fps = 24
+    current_frame = 0
+    total_frames = len(df_ball_interp)
+    playing = False  # Start in a paused state
+    
+    # Button dimensions
+    button_width = 100
+    button_height = 40
+    button_margin = 10
+    controls_y = window_height - button_height - button_margin
+    
+    # Define buttons
+    start_button = pygame.Rect(button_margin, controls_y, button_width, button_height)
+    stop_button = pygame.Rect(button_margin + 110, controls_y, button_width, button_height)
+    restart_button = pygame.Rect(button_margin + 220, controls_y, button_width, button_height)
+    possession_button = pygame.Rect(button_margin + 330, controls_y, button_width + 60, button_height)
+    back_button = pygame.Rect(button_margin + 500, controls_y, button_width, button_height)
+    
+    font = pygame.font.SysFont("Arial", 24)
+    
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                elif event.key == pygame.K_SPACE:
+                    playing = not playing
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if start_button.collidepoint(event.pos):
+                    playing = True
+                elif stop_button.collidepoint(event.pos):
+                    playing = False
+                elif restart_button.collidepoint(event.pos):
+                    current_frame = 0
+                    playing = False
+                elif possession_button.collidepoint(event.pos):
+                    # Pause animation
+                    playing = False
+                    
+                    # Open possession selection menu
+                    result = possession_selection_menu(match_id, df_possesion_first_period, df_possesion_second_period)
+                    
+                    if result:
+                        period, possession_idx = result
+                        # Set the flag for viewing a possession
+                        viewing_possession = True
+                        
+                        # Get the appropriate dataframe based on period
+                        period_df = df_possesion_first_period if period == "1st Period" else df_possesion_second_period
+                        
+                        # Prepare possession data
+                        possession = period_df.iloc[possession_idx]
+                        timestamp = possession['seconds']
+                        
+                        # Filter data for the time window
+                        window_start = timestamp - 3  # 3 seconds before\\
+                        window_end = timestamp + 7    # 7 seconds after
+                        
+                        df_team_home = df_home[(df_home['timestamp'] >= window_start) & (df_home['timestamp'] <= window_end)]
+                        df_team_away = df_away[(df_away['timestamp'] >= window_start) & (df_away['timestamp'] <= window_end)]
+                        df_ball_event = df_ball[(df_ball['timestamp'] >= window_start) & (df_ball['timestamp'] <= window_end)]
+                        
+                        if not df_team_home.empty and not df_team_away.empty and not df_ball_event.empty:
+                            # Process data
+                            possession_ball_interp = interpolate_ball_data(df_ball_event, frames_between)
+                            possession_home_frames, possession_home_positions = prepare_player_data(df_team_home, "home")
+                            possession_away_frames, possession_away_positions = prepare_player_data(df_team_away, "away")
+                            
+                            # Set active data to the possession data
+                            df_ball_interp = possession_ball_interp
+                            home_frames = possession_home_frames
+                            home_positions = possession_home_positions
+                            away_frames = possession_away_frames
+                            away_positions = possession_away_positions
+                            
+                            # Reset frame counter
+                            current_frame = 0
+                            total_frames = len(df_ball_interp)
+                            
+                            # Update info text
+                            possession_info = f"{period} - {possession['losing_team']} lost to {possession['gaining_team']}"
+                
+                elif back_button.collidepoint(event.pos):
+                    if viewing_possession:
+                        # If we're viewing a possession, go back to full match view
+                        viewing_possession = False
+                        # Reset to full match data
+                        df_ball_interp = interpolate_ball_data(df_ball, frames_between)
+                        home_frames, home_positions = prepare_player_data(df_home, "home")
+                        away_frames, away_positions = prepare_player_data(df_away, "away")
+                        current_frame = 0
+                        total_frames = len(df_ball_interp)
+                        possession_info = ""
+                    else:
+                        # Otherwise go back to match selection
+                        return "menu"
+        
+        # Update frame if playing
+        if playing and total_frames > 0:
+            current_frame = (current_frame + 1) % total_frames
+        
+        # Draw the current frame
+        frame_surface = draw_frame(current_frame, df_ball_interp, home_frames, home_positions, away_frames, away_positions)
+        screen.blit(frame_surface, (0, 0))
+        
+        # Draw background for controls
+        controls_bg = pygame.Rect(0, controls_y - 10, window_width, button_height + 20)
+        pygame.draw.rect(screen, (0, 0, 0, 180), controls_bg)  # Semi-transparent black
+        
+        # Draw buttons
+        pygame.draw.rect(screen, (0, 200, 0), start_button)  # Green for Start
+        pygame.draw.rect(screen, (200, 0, 0), stop_button)   # Red for Stop
+        pygame.draw.rect(screen, (0, 0, 200), restart_button)  # Blue for Restart
+        pygame.draw.rect(screen, (200, 100, 0), possession_button)  # Orange for Possession
+        pygame.draw.rect(screen, (100, 100, 100), back_button)  # Gray for Back
+        
+        # Add button labels
+        start_text = font.render("Start", True, (255, 255, 255))
+        stop_text = font.render("Stop", True, (255, 255, 255))
+        restart_text = font.render("Restart", True, (255, 255, 255))
+        possession_text = font.render("Possessions", True, (255, 255, 255))
+        back_text = font.render("Back", True, (255, 255, 255))
+        
+        screen.blit(start_text, (start_button.x + 20, start_button.y + 5))
+        screen.blit(stop_text, (stop_button.x + 20, stop_button.y + 5))
+        screen.blit(restart_text, (restart_button.x + 10, restart_button.y + 5))
+        screen.blit(possession_text, (possession_button.x + 10, possession_button.y + 5))
+        screen.blit(back_text, (back_button.x + 20, back_button.y + 5))
+        
+        # Add match and frame info
+        if viewing_possession:
+            match_info = font.render(f"Possession Change: {possession_info} - Frame: {current_frame}/{total_frames}", True, (255, 255, 255))
+        else:
+            match_info = font.render(f"Match ID: {match_id} - Frame: {current_frame}/{total_frames}", True, (255, 255, 255))
+        
+        screen.blit(match_info, (window_width - 500, controls_y + 5))
+        
+        # Update the display
+        pygame.display.flip()
+        clock.tick(fps)
+    
+    return "quit"
+
+>>>>>>> parent of f82d795 (interpolation fixed)
 
 def main():
     while True:
