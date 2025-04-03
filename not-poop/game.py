@@ -363,7 +363,16 @@ def highlight_animation_screen(match_id, period, possession_idx):
     
     print(f"Successfully loaded highlight data: {len(df_ball)} ball points, {len(df_home)} home player points, {len(df_away)} away player points")
     
-    # Interpolate highlight data
+    # Calculate the real-time duration of the highlight
+    if len(df_ball) >= 2:
+        start_time = df_ball['timestamp'].min()
+        end_time = df_ball['timestamp'].max()
+        real_duration = end_time - start_time
+        print(f"Real-time highlight duration: {real_duration:.2f} seconds")
+    else:
+        real_duration = 10  # Default duration if we can't calculate
+    
+    # Interpolate highlight data - use your desired interpolation factor
     frames_between = 12
     df_ball_interp = interpolate_ball_data(df_ball, frames_between)
     home_frames, home_positions = prepare_player_data(df_home, "home")
@@ -372,9 +381,16 @@ def highlight_animation_screen(match_id, period, possession_idx):
     total_frames = len(df_ball_interp)
     print(f"Interpolated to {total_frames} frames")
     
+    # Calculate FPS based on the real duration and total frames
+    # This ensures playback is at real-time speed regardless of interpolation
+    if real_duration > 0:
+        target_fps = total_frames / real_duration
+        print(f"Target FPS for real-time playback: {target_fps:.2f}")
+    else:
+        target_fps = 60  # Default FPS
+    
     # Game loop settings
     clock = pygame.time.Clock()
-    fps = 24
     current_frame = 0
     playing = True  # Start in a playing state for highlights
     
@@ -455,7 +471,9 @@ def highlight_animation_screen(match_id, period, possession_idx):
         
         # Update the display
         pygame.display.flip()
-        clock.tick(fps)
+        
+        # Use the calculated target_fps instead of a fixed fps
+        clock.tick(target_fps)
     
     return "highlights"  # Return to highlight selection by default
 # Animation screen
@@ -633,7 +651,7 @@ def animation_screen(match_id):
         return
     
     # Interpolate full match data
-    frames_between = 12
+    frames_between = 59 # 60 FPS
     df_ball_interp = interpolate_ball_data(df_ball, frames_between)
     home_frames, home_positions = prepare_player_data(df_home, "home")
     away_frames, away_positions = prepare_player_data(df_away, "away")
@@ -649,7 +667,7 @@ def animation_screen(match_id):
     
     # Game loop settings
     clock = pygame.time.Clock()
-    fps = 24
+    fps = 60
     current_frame = 0
     total_frames = len(df_ball_interp)
     playing = False  # Start in a paused state
