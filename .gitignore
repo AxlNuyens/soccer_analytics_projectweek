@@ -127,6 +127,8 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+tutorial.ipynb
+
 # Environments
 .env
 .venv
@@ -172,6 +174,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+<<<<<<< HEAD
 
-
-*.ipynb
+# models
+/un-xPass
+=======
+quick.py
+>>>>>>> upstream/main
