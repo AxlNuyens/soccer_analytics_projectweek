@@ -23,7 +23,6 @@ def get_connection():
         port=PG_PORT,
         sslmode="require",
     )
-
 # SQL queries
 # PLEASE MAKE IT CUSTOMIZABLE SOON HAL THIS IS BAD
 BALL_QUERY = """
