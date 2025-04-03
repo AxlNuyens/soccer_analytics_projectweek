@@ -20,7 +20,7 @@ PG_DATABASE = os.getenv("PG_DB")
 import psycopg2
 import os
 from scipy.interpolate import interp1d
-from easing import easing
+
 
 conn = psycopg2.connect(
     host=PG_HOST,
