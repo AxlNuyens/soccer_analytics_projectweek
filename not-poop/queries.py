@@ -149,12 +149,97 @@ POSSESSION_QUERY = """
     """
 
 # Function to get all available matches
-def get_all_matches():
+def get_all_matchups():
     conn = get_connection()
     matches_df = pd.read_sql_query(LIST_OF_ALL_MATCHES, conn)
     conn.close()
     return matches_df
+# Add this new function to queries.py
+def load_possession_data(match_id):
+    """Load only possession change data for highlights menu"""
+    conn = get_connection()
+    df_possesion = pd.read_sql_query(POSSESSION_QUERY, conn, params=(match_id,))
+    
+    df_possesion_first_period = df_possesion[df_possesion['period_id'] == 1]
+    df_possesion_second_period = df_possesion[df_possesion['period_id'] == 2]
+    
+    conn.close()
+    return None, None, None, df_possesion_first_period, df_possesion_second_period
 
+def load_highlight_data(match_id, timestamp, window_seconds=10):
+    """Load data for a specific highlight window"""
+    conn = get_connection()
+    
+    # Calculate time window
+    window_start = timestamp - 3  # 3 seconds before
+    window_end = timestamp + 7    # 7 seconds after
+    
+    print(f"Loading highlight data for time window: {window_start} to {window_end} seconds")
+    
+    # Get team IDs first
+    team_ids_df = pd.read_sql_query(TEAM_QUERY, conn, params=(match_id,))
+    team_ids = team_ids_df['team_id'].tolist()
+    
+    if len(team_ids) < 2:
+        print("Not enough teams found for this match")
+        conn.close()
+        return None, None, None  # No data available for this match
+    
+    # Get period ID from timestamp
+    period_id = 1
+    if timestamp > 45*60:  # If timestamp is after 45 minutes, it's second period
+        period_id = 2
+    
+    # Modified queries that filter by using pattern matching on the timestamp string
+    # instead of EXTRACT() function which is causing problems
+    ball_query_highlight = """
+    SELECT pt.period_id, pt.frame_id, pt.timestamp, pt.x, pt.y, pt.player_id, p.team_id
+    FROM player_tracking pt
+    JOIN players p ON pt.player_id = p.player_id
+    JOIN teams t ON p.team_id = t.team_id
+    WHERE pt.game_id = %s 
+      AND p.player_id = 'ball'
+      AND pt.period_id = %s
+    ORDER BY timestamp;
+    """
+    
+    team_query_highlight = """
+    SELECT pt.frame_id, pt.timestamp, pt.player_id, pt.x, pt.y, p.team_id
+    FROM player_tracking pt
+    JOIN players p ON pt.player_id = p.player_id
+    JOIN teams t ON p.team_id = t.team_id
+    WHERE pt.game_id = %s 
+      AND p.player_id != 'ball' 
+      AND p.team_id = %s
+      AND pt.period_id = %s
+    ORDER BY timestamp;
+    """
+    
+    try:
+        # Execute queries without time filtering
+        df_ball = pd.read_sql_query(ball_query_highlight, conn, params=(match_id, period_id))
+        df_home = pd.read_sql_query(team_query_highlight, conn, params=(match_id, team_ids[0], period_id))
+        df_away = pd.read_sql_query(team_query_highlight, conn, params=(match_id, team_ids[1], period_id))
+        
+        # Convert timestamps to seconds
+        df_home['timestamp'] = pd.to_timedelta(df_home['timestamp']).dt.total_seconds().astype(float)
+        df_away['timestamp'] = pd.to_timedelta(df_away['timestamp']).dt.total_seconds().astype(float)
+        df_ball['timestamp'] = pd.to_timedelta(df_ball['timestamp']).dt.total_seconds().astype(float)
+        
+        # Now filter in Python instead of SQL
+        df_ball = df_ball[(df_ball['timestamp'] >= window_start) & (df_ball['timestamp'] <= window_end)]
+        df_home = df_home[(df_home['timestamp'] >= window_start) & (df_home['timestamp'] <= window_end)]
+        df_away = df_away[(df_away['timestamp'] >= window_start) & (df_away['timestamp'] <= window_end)]
+        
+        print(f"Data retrieved: {len(df_ball)} ball records, {len(df_home)} home team records, {len(df_away)} away team records")
+        
+    except Exception as e:
+        print(f"Error loading highlight data: {e}")
+        conn.close()
+        return None, None, None
+    
+    conn.close()
+    return df_ball, df_home, df_away
 # Load data from the database
 def load_data(match_id):
     conn = get_connection()
