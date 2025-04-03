@@ -172,6 +172,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+<<<<<<< HEAD
 
 # models
 /un-xPass
+=======
+quick.py
+>>>>>>> upstream/main

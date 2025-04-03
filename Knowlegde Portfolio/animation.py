@@ -7,6 +7,7 @@ import os
 from matplotlib import animation
 from matplotlib import pyplot as plt
 from mplsoccer import Pitch
+from scipy.interpolate import interp1d
 
 dotenv.load_dotenv()
 
@@ -15,12 +16,6 @@ PG_USER = os.getenv("PG_USER")
 PG_HOST = os.getenv("PG_HOST")
 PG_PORT = os.getenv("PG_PORT")
 PG_DATABASE = os.getenv("PG_DB")
-
-# Database connection parameters
-import psycopg2
-import os
-from scipy.interpolate import interp1d
-
 
 conn = psycopg2.connect(
     host=PG_HOST,
