@@ -7,6 +7,9 @@ import os
 from matplotlib import animation
 from matplotlib import pyplot as plt
 from mplsoccer import Pitch
+import psycopg2
+import os
+from scipy.interpolate import interp1d
 
 dotenv.load_dotenv()
 
@@ -20,7 +23,7 @@ PG_DATABASE = os.getenv("PG_DB")
 import psycopg2
 import os
 from scipy.interpolate import interp1d
-from easing import easing
+
 
 conn = psycopg2.connect(
     host=PG_HOST,
@@ -125,7 +128,7 @@ def interpolate_ball_data(ball_df, frames_between=3):
     return result_df
 
 # Apply interpolation to the ball data only - standard 24fps for video
-frames_between = 12  # Adjusted to match 24fps better, CHANGE THIS TO MAKE IT FASTER OR SLOWER
+frames_between = 24  # Adjusted to match 24fps better, CHANGE THIS TO MAKE IT FASTER OR SLOWER
 df_ball_interp = interpolate_ball_data(df_ball, frames_between)
 
 # Group players by frame_id to prepare player position interpolation
@@ -217,11 +220,6 @@ def animate(i):
 
 # Call the animator - set to 24fps
 anim = animation.FuncAnimation(fig, animate, frames=len(df_ball_interp), 
-                              interval=40,  # 24fps = 41.67ms per frame
-                              repeat_delay=1, blit=True, repeat=False)
+                              interval=8.3,  # For 120 fps specifically
+                              repeat_delay=1, blit=True)
 plt.show()
-
-# Save animation at exactly 24fps for proper playback speed
-#anim.save('smooth_soccer.mp4', dpi=150, fps=24, writer='ffmpeg',
-#         extra_args=['-vcodec', 'libx264'],
-#         savefig_kwargs={'pad_inches':0, 'facecolor':'#457E29'})
