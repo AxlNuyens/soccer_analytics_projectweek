@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pygame
 from pygame.locals import *
 from matplotlib import animation, pyplot as plt
@@ -530,6 +531,7 @@ def highlight_animation_screen(specific_match_id,starting_timestamp):
     return "highlights"
 
 
+>>>>>>> parent of f82d795 (interpolation fixed)
 
 def main():
     while True:
